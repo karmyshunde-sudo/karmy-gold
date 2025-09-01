@@ -1,0 +1,88 @@
+name: Karmy-Gold ETF策略
+
+on:
+  schedule:
+    # 北京时间对应关系 (UTC+8)
+    - cron: '0 8 * * 1-5'    # ETF日线数据爬取（16:00 北京时间）
+    - cron: '40 1-6 * * 1-5' # 仓位策略（9:40~14:40 北京时间）
+    - cron: '0 12 * * 0'     # ETF列表更新（20:00 北京时间，周日）
+    - cron: '0 17 * * *'      # 数据清理（凌晨1:00 北京时间）
+  workflow_dispatch:
+    inputs:
+      task:
+        description: '任务类型'
+        required: true
+        type: choice
+        options:
+          - 'calculate_position'
+          - 'update_etf_list'
+          - 'clean_data'  # 新增数据清理选项
+
+jobs:
+  run_karmy_gold:
+    if: >-
+      (github.event_name == 'schedule') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.task != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout代码
+        uses: actions/checkout@v4
+
+      - name: 设置Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy akshare requests
+
+      - name: 配置环境变量
+        run: |
+          echo "WECOM_WEBHOOK=${{ secrets.WECOM_WEBHOOK }}" >> $GITHUB_ENV
+
+      - name: 执行Karmy-Gold策略
+        run: |
+          python main.py
+        env:
+          TASK: ${{ github.event.inputs.task || 'calculate_position' }}
+
+      - name: 提交数据变更
+        if: >-
+          steps.execute_task.outputs.status == 'success' &&
+          steps.execute_task.outputs.task != 'clean_data'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # 添加所有数据文件
+          git add data/etf_daily/ data/flags/ data/logs/ data/*.csv --force
+          
+          echo "=== 暂存区文件 ==="
+          git status --porcelain
+          echo "=================="
+          
+          # 检查是否有变更需要提交
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "自动更新数据[$TASK]: $(date -u -d "+8 hours" '+%Y-%m-%d %H:%M')"
+            git push origin main
+            echo "数据提交成功"
+          else
+            echo "无数据变更需要提交"
+          fi
+
+      - name: 处理提交冲突
+        if: >-
+          steps.execute_task.outputs.status == 'success' &&
+          steps.execute_task.outputs.task != 'clean_data' &&
+          failure()
+        run: |
+          echo "检测到提交冲突，尝试解决..."
+          git pull origin main --rebase
+          git push origin main
+          echo "冲突已解决并提交"
