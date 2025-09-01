@@ -1,0 +1,21 @@
+karmy-gold/
+├── main.py                 # 主程序入口
+├── config.py               # 配置文件
+├── etf_scoring.py          # ETF评分系统
+├── position.py             # 仓位策略
+├── date_utils.py           # 日期工具
+├── file_utils.py           # 文件工具
+├── wechat_push.py          # 微信推送功能
+├── data/                   # 数据目录
+│   ├── etf_daily/          # ETF日线数据
+│   ├── flags/              # 策略标记文件
+│   ├── logs/               # 日志文件
+│   ├── etf_metadata.csv    # ETF元数据
+│   ├── etf_score_history.csv # ETF评分历史
+│   ├── etf_correlation_data.csv # ETF相关性数据
+│   └── all_etfs.csv        # 全市场ETF列表
+├── karmy-etf.csv           # 兜底ETF列表（根目录）
+├── .env                    # 环境变量文件
+├── requirements.txt        # 依赖项
+└── .github/workflows/      # GitHub Actions工作流
+    └── karmy_gold.yml      # 策略执行工作流
